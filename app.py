@@ -16,7 +16,7 @@ import asyncio
 import glob
 
 api_key = os.getenv('OPENAI_API_KEY')
-qa = None
+qa_chain = None
 
 async def main():
 
@@ -78,8 +78,8 @@ async def main():
             with st.spinner("Procesando..."):
                 file_name = Path(selected_file).stem
                 vectors = await getDocEmbeds(selected_file, file_name)
-                global qa
-                qa = ConversationalRetrievalChain.from_llm(ChatOpenAI(model_name="gpt-3.5-turbo"),
+                global qa_chain
+                qa_chain = ConversationalRetrievalChain.from_llm(ChatOpenAI(model_name="gpt-3.5-turbo"),
                                                           retriever=vectors.as_retriever(),
                                                           return_source_documents=True)
 
@@ -90,7 +90,7 @@ async def main():
     if st.session_state['ready']:
 
         if 'generated' not in st.session_state:
-            st.session_state['generated'] = ["¡Bienvenido! Ahora puedes hacer cualquier pregunta sobre el archivo PDF"]
+            st.session_state['generated'] = ["¡Bienvenido! Ahora puedes hacer preguntas sobre el documento"]
 
         if 'past' not in st.session_state:
             st.session_state['past'] = ["¡Hola!"]
@@ -103,12 +103,12 @@ async def main():
 
         with container:
             with st.form(key='my_form', clear_on_submit=True):
-                user_input = st.text_input("Consulta:", placeholder="Ejemplo: Resume el contenido del documento en unas pocas frases",
+                user_input = st.text_input("Consulta:", placeholder="Por ejemplo: Resume el contenido del documento en unas pocas frases",
                                            key='input')
                 submit_button = st.form_submit_button(label='Enviar')
 
             if submit_button and user_input:
-                output = await conversational_chat(user_input, qa)
+                output = await conversational_chat(user_input, qa_chain)
                 st.session_state['past'].append(user_input)
                 st.session_state['generated'].append(output)
 
