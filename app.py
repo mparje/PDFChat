@@ -45,6 +45,9 @@ async def main():
         return vectors
 
     async def conversational_chat(query):
+        if qa is None:
+            return "El modelo de preguntas y respuestas no está inicializado"
+        
         result = qa({"question": query, "chat_history": st.session_state['history']})
         st.session_state['history'].append((query, result["answer"]))
         return result["answer"]
@@ -79,11 +82,14 @@ async def main():
                 with open(selected_file, "rb") as f:
                     vectors = await getDocEmbeds(io.BytesIO(f.read()), Path(selected_file).stem)
                     global qa
-                    qa = ConversationalRetrievalChain.from_llm(ChatOpenAI(model_name="gpt-3.5-turbo"),
-                                                               retriever=vectors.as_retriever(),
-                                                               return_source_documents=True)
+                    qa = ConversationalRetrievalChain.from_llm(
+                        ChatOpenAI(model_name="gpt-3.5-turbo"), retriever=vectors.as_retriever(),
+                        return_source_documents=True
+                    )
 
                 st.session_state['ready'] = True
+    else:
+        st.write("No se encontraron archivos PDF en la carpeta.")
 
     st.divider()
 
@@ -102,7 +108,8 @@ async def main():
 
         with container:
             with st.form(key='my_form', clear_on_submit=True):
-                user_input = st.text_input("Consulta:", placeholder="Ejemplo: Resume el contenido del documento en unas pocas frases",
+                user_input = st.text_input("Consulta:",
+                                           placeholder="Ejemplo: Resume el contenido del documento en unas pocas frases",
                                            key='input')
                 submit_button = st.form_submit_button(label='Enviar')
 
