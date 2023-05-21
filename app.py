@@ -44,11 +44,8 @@ async def main():
 
         return vectors
 
-    async def conversational_chat(query):
-        if qa is None:
-            return "El modelo de preguntas y respuestas no está inicializado"
-        
-        result = qa({"question": query, "chat_history": st.session_state['history']})
+    async def conversational_chat(query, qa_chain):
+        result = qa_chain({"question": query, "chat_history": st.session_state['history']})
         st.session_state['history'].append((query, result["answer"]))
         return result["answer"]
 
@@ -78,22 +75,20 @@ async def main():
         selected_file = st.selectbox("Selecciona un archivo", pdf_files)
 
         if st.button("Procesar archivo"):
-            with st.spinner("Procesando archivo..."):
-                with open(selected_file, "rb") as f:
-                    vectors = await getDocEmbeds(io.BytesIO(f.read()), Path(selected_file).stem)
-                    global qa
-                    qa = ConversationalRetrievalChain.from_llm(
-                        ChatOpenAI(model_name="gpt-3.5-turbo"), retriever=vectors.as_retriever(),
-                        return_source_documents=True
-                    )
+            with st.spinner("Procesando..."):
+                file_name = Path(selected_file).stem
+                vectors = await getDocEmbeds(selected_file, file_name)
+                global qa
+                qa = ConversationalRetrievalChain.from_llm(ChatOpenAI(model_name="gpt-3.5-turbo"),
+                                                          retriever=vectors.as_retriever(),
+                                                          return_source_documents=True)
 
-                st.session_state['ready'] = True
-    else:
-        st.write("No se encontraron archivos PDF en la carpeta.")
+            st.session_state['ready'] = True
 
     st.divider()
 
     if st.session_state['ready']:
+
         if 'generated' not in st.session_state:
             st.session_state['generated'] = ["¡Bienvenido! Ahora puedes hacer cualquier pregunta sobre el archivo PDF"]
 
@@ -108,13 +103,12 @@ async def main():
 
         with container:
             with st.form(key='my_form', clear_on_submit=True):
-                user_input = st.text_input("Consulta:",
-                                           placeholder="Ejemplo: Resume el contenido del documento en unas pocas frases",
+                user_input = st.text_input("Consulta:", placeholder="Ejemplo: Resume el contenido del documento en unas pocas frases",
                                            key='input')
                 submit_button = st.form_submit_button(label='Enviar')
 
             if submit_button and user_input:
-                output = await conversational_chat(user_input)
+                output = await conversational_chat(user_input, qa)
                 st.session_state['past'].append(user_input)
                 st.session_state['generated'].append(output)
 
