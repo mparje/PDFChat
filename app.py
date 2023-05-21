@@ -13,49 +13,40 @@ import streamlit as st
 from streamlit_chat import message
 import io
 import asyncio
+import glob
 
-
-api_key = os.getenv('OPENAI_API_KEY')  
-
-# vectors = getDocEmbeds("gpt4.pdf")
-# qa = ChatVectorDBChain.from_llm(ChatOpenAI(model_name="gpt-3.5-turbo"), vectors, return_source_documents=True)
+api_key = os.getenv('OPENAI_API_KEY')
 
 async def main():
 
     async def storeDocEmbeds(file, filename):
-    
+
         reader = PdfReader(file)
         corpus = ''.join([p.extract_text() for p in reader.pages if p.extract_text()])
-        
-        splitter =  RecursiveCharacterTextSplitter(chunk_size=1000,chunk_overlap=200,)
+
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
         chunks = splitter.split_text(corpus)
-        
-        embeddings = OpenAIEmbeddings(openai_api_key = api_key)
+
+        embeddings = OpenAIEmbeddings(openai_api_key=api_key)
         vectors = FAISS.from_texts(chunks, embeddings)
-        
+
         with open(filename + ".pkl", "wb") as f:
             pickle.dump(vectors, f)
 
-        
     async def getDocEmbeds(file, filename):
-        
+
         if not os.path.isfile(filename + ".pkl"):
             await storeDocEmbeds(file, filename)
-        
+
         with open(filename + ".pkl", "rb") as f:
-            global vectores
             vectors = pickle.load(f)
-            
+
         return vectors
-    
 
     async def conversational_chat(query):
         result = qa({"question": query, "chat_history": st.session_state['history']})
         st.session_state['history'].append((query, result["answer"]))
-        # print("Log: ")
-        # print(st.session_state['history'])
         return result["answer"]
-
 
     llm = ChatOpenAI(model_name="gpt-3.5-turbo")
     chain = load_qa_chain(llm, chain_type="stuff")
@@ -63,47 +54,55 @@ async def main():
     if 'history' not in st.session_state:
         st.session_state['history'] = []
 
-
-    #Creating the chatbot interface
-    st.title("PDFChat :")
+    # Creando la interfaz del chatbot
+    st.title("PDFChat")
 
     if 'ready' not in st.session_state:
         st.session_state['ready'] = False
 
-    uploaded_file = st.file_uploader("Choose a file", type="pdf")
+    # Directorio que contiene los archivos PDF
+    pdf_directory = "PDF"
 
-    if uploaded_file is not None:
+    # Obtener la lista de archivos PDF en el directorio
+    pdf_files = glob.glob(os.path.join(pdf_directory, "*.pdf"))
 
-        with st.spinner("Processing..."):
-        # Add your code here that needs to be executed
-            uploaded_file.seek(0)
-            file = uploaded_file.read()
-            # pdf = PyPDF2.PdfFileReader()
-            vectors = await getDocEmbeds(io.BytesIO(file), uploaded_file.name)
-            qa = ConversationalRetrievalChain.from_llm(ChatOpenAI(model_name="gpt-3.5-turbo"), retriever=vectors.as_retriever(), return_source_documents=True)
+    if pdf_files:
+        st.write("Archivos PDF encontrados en la carpeta:")
+        for pdf_file in pdf_files:
+            st.write(pdf_file)
 
-        st.session_state['ready'] = True
+        selected_file = st.selectbox("Selecciona un archivo", pdf_files)
+
+        if st.button("Procesar archivo"):
+            with st.spinner("Procesando archivo..."):
+                with open(selected_file, "rb") as f:
+                    vectors = await getDocEmbeds(io.BytesIO(f.read()), Path(selected_file).stem)
+                    qa = ConversationalRetrievalChain.from_llm(ChatOpenAI(model_name="gpt-3.5-turbo"),
+                                                               retriever=vectors.as_retriever(),
+                                                               return_source_documents=True)
+
+                st.session_state['ready'] = True
 
     st.divider()
 
     if st.session_state['ready']:
-
         if 'generated' not in st.session_state:
-            st.session_state['generated'] = ["Welcome! You can now ask any questions regarding " + uploaded_file.name]
+            st.session_state['generated'] = ["¡Bienvenido! Ahora puedes hacer cualquier pregunta sobre el archivo PDF"]
 
         if 'past' not in st.session_state:
-            st.session_state['past'] = ["Hey!"]
+            st.session_state['past'] = ["¡Hola!"]
 
-        # container for chat history
+        # Contenedor para el historial del chat
         response_container = st.container()
 
-        # container for text box
+        # Contenedor para el cuadro de texto
         container = st.container()
 
         with container:
             with st.form(key='my_form', clear_on_submit=True):
-                user_input = st.text_input("Query:", placeholder="e.g: Summarize the paper in a few sentences", key='input')
-                submit_button = st.form_submit_button(label='Send')
+                user_input = st.text_input("Consulta:", placeholder="Ejemplo: Resume el contenido del documento en unas pocas frases",
+                                           key='input')
+                submit_button = st.form_submit_button(label='Enviar')
 
             if submit_button and user_input:
                 output = await conversational_chat(user_input)
