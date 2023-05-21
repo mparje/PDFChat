@@ -16,6 +16,7 @@ import asyncio
 import glob
 
 api_key = os.getenv('OPENAI_API_KEY')
+qa = None
 
 async def main():
 
@@ -77,6 +78,7 @@ async def main():
             with st.spinner("Procesando archivo..."):
                 with open(selected_file, "rb") as f:
                     vectors = await getDocEmbeds(io.BytesIO(f.read()), Path(selected_file).stem)
+                    global qa
                     qa = ConversationalRetrievalChain.from_llm(ChatOpenAI(model_name="gpt-3.5-turbo"),
                                                                retriever=vectors.as_retriever(),
                                                                return_source_documents=True)
