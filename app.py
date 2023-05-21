@@ -44,8 +44,8 @@ async def main():
 
         return vectors
 
-    async def conversational_chat(query, qa_chain):
-        result = qa_chain({"question": query, "chat_history": st.session_state['history']})
+    async def conversational_chat(query, chain):
+        result = chain({"question": query, "chat_history": st.session_state['history']})
         st.session_state['history'].append((query, result["answer"]))
         return result["answer"]
 
@@ -88,7 +88,6 @@ async def main():
     st.divider()
 
     if st.session_state['ready']:
-
         if 'generated' not in st.session_state:
             st.session_state['generated'] = ["¡Bienvenido! Ahora puedes hacer preguntas sobre el documento"]
 
@@ -103,7 +102,8 @@ async def main():
 
         with container:
             with st.form(key='my_form', clear_on_submit=True):
-                user_input = st.text_input("Consulta:", placeholder="Por ejemplo: Resume el contenido del documento en unas pocas frases",
+                user_input = st.text_input("Consulta:",
+                                           placeholder="Por ejemplo: Resume el contenido del documento en unas pocas frases",
                                            key='input')
                 submit_button = st.form_submit_button(label='Enviar')
 
