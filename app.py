@@ -7,14 +7,14 @@ from langchain.chat_models import ChatOpenAI
 from langchain.chains import ConversationalRetrievalChain
 import pickle
 from pathlib import Path
-from dotenv import load_dotenv
+
 import os
 import streamlit as st
 from streamlit_chat import message
 import io
 import asyncio
 
-load_dotenv()
+
 api_key = os.getenv('OPENAI_API_KEY')  
 
 # vectors = getDocEmbeds("gpt4.pdf")
