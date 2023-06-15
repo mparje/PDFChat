@@ -24,29 +24,42 @@ qa_chain = load_qa_chain(llm, chain_type="stuff")
 async def main():
 
     async def storeDocEmbeds(file, filename):
-        # Rest of the code...
+        reader = PdfReader(file)
+        corpus = ''.join([p.extract_text() for p in reader.pages if p.extract_text()])
+
+        splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        chunks = splitter.split_text(corpus)
+
+        embeddings = OpenAIEmbeddings(openai_api_key=api_key)
+        vectors = FAISS.from_texts(chunks, embeddings)
+
+        with open(filename + ".pkl", "wb") as f:
+            pickle.dump(vectors, f)
 
     async def getDocEmbeds(file, filename):
-        # Rest of the code...
+        if not os.path.isfile(filename + ".pkl"):
+            await storeDocEmbeds(file, filename)
+
+        with open(filename + ".pkl", "rb") as f:
+            vectors = pickle.load(f)
+
+        return vectors
 
     async def conversational_chat(query, chain):
-        # Rest of the code...
+        result = chain({"question": query, "chat_history": st.session_state['history']})
+        st.session_state['history'].append((query, result["answer"]))
+        return result["answer"]
 
     if 'history' not in st.session_state:
         st.session_state['history'] = []
 
-
-
-    # Creando la interfaz del chatbot
     st.title("PDFChat")
 
     if 'ready' not in st.session_state:
         st.session_state['ready'] = False
 
-    # Directorio que contiene los archivos PDF
     pdf_directory = "PDF"
 
-    # Obtener la lista de archivos PDF en el directorio
     pdf_files = glob.glob(os.path.join(pdf_directory, "*.pdf"))
 
     if pdf_files:
@@ -76,10 +89,8 @@ async def main():
         if 'past' not in st.session_state:
             st.session_state['past'] = ["¡Hola!"]
 
-        # Contenedor para el historial del chat
         response_container = st.container()
 
-        # Contenedor para el cuadro de texto
         container = st.container()
 
         with container:
